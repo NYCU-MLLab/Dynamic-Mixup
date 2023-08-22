@@ -59,6 +59,7 @@ def run_fsintent(
         model_name_or_path: str,
         super_tau: float = 1.0,
         lr: float = 1e-6,
+        mixup_lr: float = 4e-5,
         metric: str = "euclidean",
         logger: object = None,
         super_weight: float = 0.7,
@@ -122,9 +123,8 @@ def run_fsintent(
     ]
     
     # optimizer = AdamW(fsinet.parameters(), lr=lr)
-
     optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
-    optimizer_lambda = torch.optim.SGD(optimizer_parameters_lambda, lr=0.00001)
+    optimizer_lambda = torch.optim.SGD(optimizer_parameters_lambda, lr=mixup_lr)
     logger.info(torch.cuda.list_gpu_processes())
 
     # ------------------
@@ -291,7 +291,8 @@ def main():
     parser.add_argument("--train-labels-path", type=str, required=True, help="Path to train labels. This file contains unique names of labels (i.e. one row per label)")
     parser.add_argument("--train-path", type=str, help="Path to training data (if provided, picks training data from this path instead of --data-path")
     parser.add_argument("--model-name-or-path", type=str, default='bert-base-uncased', help="Language Model PROTAUGMENT initializes from")
-    parser.add_argument("--lr", default=1e-6, type=float, help="Temperature of the contrastive loss")
+    parser.add_argument("--lr", default=1e-6, type=float, help="learning rate")
+    parser.add_argument("--mixup_lr", default=4e-5, type=float, help="mixup learning rate")
     parser.add_argument("--super-tau", default=1.0, type=float, help="Temperature of the contrastive loss in supervised loss")
     parser.add_argument("--max-len", type=int, default=64, help="maxmium length of text sequence for BERT") 
     parser.add_argument("--mixup_ratio", default=0.9)
@@ -359,6 +360,7 @@ def main():
         n_query=args.n_query,
         n_classes=args.n_classes,
         lr=args.lr,
+        mixup_lr=args.mixup_lr,
         metric=args.metric,
         logger=logger,
         max_len=args.max_len,

@@ -34,6 +34,7 @@ for cv in 01 02 03 04 05; do
         \
         --super-tau 5.0 \
         --lr 1e-4 \
+        --mixup_lr 4e-5\
         --evaluate-every 100 \
         --n-test-episodes 600 \
         --log-every 10 \
@@ -77,6 +78,7 @@ for cv in 01 02 03 04 05; do
         \
         --super-tau 5.0 \
         --lr 5e-4 \
+        --mixup_lr 3e-4\
         --super-weight 0.95 \
         --evaluate-every 100 \
         --n-test-episodes 600 \
@@ -109,7 +111,7 @@ if [ ! -d ${logdir}  ];then mkdir -p ${logdir};fi
 for cv in 01 02 03 04 05; do
     python3 -u main.py \
         --data-path ${dataset}/full.json \
-        --train-path ${dataset}/few_shot/${cv}/train_aug.json \
+        --train-path ${dataset}/few_shot/${cv}/train.json \
         --train-labels-path ${dataset}/few_shot/${cv}/labels.train.txt \
         --valid-labels-path ${dataset}/few_shot/${cv}/labels.valid.txt \
         --test-labels-path ${dataset}/few_shot/${cv}/labels.test.txt \
@@ -122,6 +124,7 @@ for cv in 01 02 03 04 05; do
         \
         --super-tau 5.0 \
         --lr 5e-5 \
+        --mixup_lr 5e-5\
         --super-weight 0.95 \
         --evaluate-every 100 \
         --n-test-episodes 1000 \
@@ -150,10 +153,10 @@ C=5
 
 if [ ! -d ${logdir}  ];then mkdir -p ${logdir};fi
 
-for cv in 03 04 05; do
+for cv in 01 02 03 04 05; do
     python -u main.py \
         --data-path ${dataset}/full.json \
-        --train-path ${dataset}/few_shot/${cv}/train_aug.json \
+        --train-path ${dataset}/few_shot/${cv}/train.json \
         --train-labels-path ${dataset}/few_shot/${cv}/labels.train.txt \
         --valid-labels-path ${dataset}/few_shot/${cv}/labels.valid.txt \
         --test-labels-path ${dataset}/few_shot/${cv}/labels.test.txt \
@@ -166,6 +169,7 @@ for cv in 03 04 05; do
         \
         --super-tau 5.0 \
         --lr 1e-3 \
+        --mixup_lr 1e-4\
         --super-weight 0.95 \
         --evaluate-every 100 \
         --n-test-episodes 1000 \

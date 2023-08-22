@@ -195,7 +195,7 @@ class ContrastNet(nn.Module):
         return y_pred
 
 
-    def loss(self, sample, l, k, supervised_loss_share: float = 0):
+    def loss(self, sample, l, k, supervised_loss_share: float = 0, mode='train'):
         """
         :param supervised_loss_share: share of supervised loss in total loss
         :param sample: {
@@ -244,33 +244,35 @@ class ContrastNet(nn.Module):
         Mixup = self.mixup(z, l, z_proto=z_proto)
         # z_support_mixup = torch.cat((z[:len(supports)],Mixup), dim=0)
 
-        z_support_mixup = torch.zeros((1,768)).to(device)
-        
-        if(k=='1'):
-            for i in range(5):
-                z_support_mixup_temp = torch.cat((z[i].unsqueeze(0), Mixup[i].unsqueeze(0)), dim=0)
-                z_support_mixup = torch.cat((z_support_mixup, z_support_mixup_temp), dim=0)
-        
-        elif(k=='5'):
-            for i in range(5):
-                z_support_mixup_temp = torch.cat((z[i*5:i*5+5], Mixup[i*5:i*5+5]), dim=0)
-                z_support_mixup = torch.cat((z_support_mixup, z_support_mixup_temp), dim=0)
+        if(mode=='train'):
+            z_support_mixup = torch.zeros((1,768)).to(device)
+            if(k=='1'):
+                for i in range(5):
+                    z_support_mixup_temp = torch.cat((z[i].unsqueeze(0), Mixup[i].unsqueeze(0)), dim=0)
+                    z_support_mixup = torch.cat((z_support_mixup, z_support_mixup_temp), dim=0)
+            
+            elif(k=='5'):
+                for i in range(5):
+                    z_support_mixup_temp = torch.cat((z[i*5:i*5+5], Mixup[i*5:i*5+5]), dim=0)
+                    z_support_mixup = torch.cat((z_support_mixup, z_support_mixup_temp), dim=0)
 
-        z_support_mixup_proto = z_support_mixup[1:,:].view(n_class, n_support*2, z_dim).mean(dim=[1])
-
-
-        ### maximum entropy
-        s = dot_similarity(Mixup, z_support_proto)
-        entropy = ((s).softmax(1)*(s).log_softmax(1)).sum(1)
-        entropy = -(entropy).mean()
-
-        ### minimize prototypical loss
-        s_query = dot_similarity(z_query, z_support_mixup_proto)
-        log_p_y = torch.nn.functional.log_softmax(s_query, dim=1).view(n_class, n_query, -1)
-        CE_loss = -log_p_y.gather(2, support_inds).squeeze().view(-1).mean()
+            z_support_mixup_proto = z_support_mixup[1:,:].view(n_class, n_support*2, z_dim).mean(dim=[1])
 
 
-        mixup_loss = 0.1* (-entropy) + 0.1* (CE_loss)
+            ### maximum entropy
+            s = dot_similarity(Mixup, z_support_proto)
+            entropy = ((s).softmax(1)*(s).log_softmax(1)).sum(1)
+            entropy = -(entropy).mean()
+
+            ### minimize prototypical loss
+            s_query = dot_similarity(z_query, z_support_mixup_proto)
+            log_p_y = torch.nn.functional.log_softmax(s_query, dim=1).view(n_class, n_query, -1)
+            CE_loss = -log_p_y.gather(2, support_inds).squeeze().view(-1).mean()
+
+
+            mixup_loss = 0.1* (-entropy) + 0.1* (CE_loss)
+        if(mode=='test'):
+            mixup_loss=0
 
         ### For contrastive loss
         z_query_in = z_query
@@ -290,9 +292,9 @@ class ContrastNet(nn.Module):
             "metrics": {
                 "acc": acc.item(),
                 "loss": final_loss.item(),
-                "mixup_loss: ": mixup_loss.item(),
-                "entropy_loss: ": entropy.item(),
-                "CE_loss: ": CE_loss.item(),
+                # "mixup_loss: ": mixup_loss.item(),
+                # "entropy_loss: ": entropy.item(),
+                # "CE_loss: ": CE_loss.item(),
             },
             "target": support_inds
             # "target": target_inds
@@ -306,14 +308,14 @@ class ContrastNet(nn.Module):
         torch.cuda.empty_cache()
         self.encoder.embeddings.word_embeddings.soft_prompt.weight.requires_grad = False
         l.requires_grad = True
-        loss, mixup_loss, loss_dict = self.loss(episode, l, k, supervised_loss_share=supervised_loss_share)
+        loss, mixup_loss, loss_dict = self.loss(episode, l, k, supervised_loss_share=supervised_loss_share,mode='train')
         mixup_loss.backward(retain_graph=True)
         optimizer_lambda.step()
         optimizer_lambda.zero_grad()
         
         l.requires_grad = False
         self.encoder.embeddings.word_embeddings.soft_prompt.weight.requires_grad = True
-        loss1, mixup_loss1, loss_dict1 = self.loss(episode, l, k, supervised_loss_share=supervised_loss_share)
+        loss1, mixup_loss1, loss_dict1 = self.loss(episode, l, k, supervised_loss_share=supervised_loss_share,mode='train')
         loss1.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -323,13 +325,12 @@ class ContrastNet(nn.Module):
 
     def test_step(self, l, k, dataset: FewShotDataset, n_episodes: int = 1000):
         metrics = collections.defaultdict(list)
-
         self.eval()
         for i in range(n_episodes):
             episode = dataset.get_episode()
 
             with torch.no_grad():
-                loss, mixup_loss, loss_dict = self.loss(episode, l, k, supervised_loss_share=1)
+                loss, mixup_loss, loss_dict = self.loss(episode, l, k, supervised_loss_share=1,mode='test')
 
             for k, v in loss_dict["metrics"].items():
                 metrics[k].append(v)
